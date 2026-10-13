@@ -34,9 +34,9 @@ public class LargeFileSortStrategy : ISortStrategy
             using DuckDBConnection connection = CreateAndInitializeDb(
                 options, tempDirectory, tempFile);
 
-            SortAndSaveData(connection, options.InputFilePath, outputFile);
+            // SortAndSaveData(connection, options.InputFilePath, outputFile);
             // ImportThenSortAndSaveData(connection, options.InputFilePath, outputFile);
-            // SplitThenSortAndSaveData(connection, options.InputFilePath, outputFile);
+            SplitThenSortAndSaveData(connection, options.InputFilePath, outputFile);
         }
         finally
         {
@@ -141,7 +141,6 @@ public class LargeFileSortStrategy : ISortStrategy
                     }},
                     parallel = true
                 )
-                ORDER BY Value, Number
             ) TO 'parquets'
             (FORMAT {format}, OVERWRITE true);
         ";

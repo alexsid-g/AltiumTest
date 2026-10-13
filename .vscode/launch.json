@@ -25,9 +25,9 @@
             "preLaunchTask": "Debug build solution",
             "program": "${workspaceFolder}/FileSorter/bin/Debug/net8.0/FileSorter.dll",
             "args": [
-                "-i", "test-5gb.txt",
+                "-i", "test-1gb.txt",
                 "-o", "sorted-data.txt",
-                "-m", "4GB"
+                "-m", "1GB"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"

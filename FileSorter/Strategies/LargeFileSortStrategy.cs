@@ -34,9 +34,9 @@ public class LargeFileSortStrategy : ISortStrategy
             using DuckDBConnection connection = CreateAndInitializeDb(
                 options, tempDirectory, tempFile);
 
-            // SortAndSaveData(connection, options.InputFilePath, outputFile);
-            // ImportThenSortAndSaveData(connection, options.InputFilePath, outputFile);
-            SplitThenSortAndSaveData(connection, options.InputFilePath, outputFile);
+            //SortAndSaveData(connection, options.InputFilePath, outputFile);
+            ImportThenSortAndSaveData(connection, options.InputFilePath, outputFile);
+            //SplitThenSortAndSaveData(connection, options.InputFilePath, outputFile, tempDirectory);
         }
         finally
         {
@@ -114,7 +114,7 @@ public class LargeFileSortStrategy : ISortStrategy
             (FORMAT CSV, HEADER false, DELIMITER '.');
 
             COPY (
-                SELECT Number, Value 
+                SELECT *
                 FROM temp_sorting
                 ORDER BY Value, Number
             ) TO '{outputFile}' 
@@ -125,39 +125,51 @@ public class LargeFileSortStrategy : ISortStrategy
     }
 
     private static void SplitThenSortAndSaveData(
-        DuckDBConnection connection, string inputFile, string outputFile)
+        DuckDBConnection connection, string inputFile, string outputFile, string tempDirectory)
     {
-        string format = GetFormatFor("PARQUET");
-        string sql = @$"
-            COPY (
-                SELECT Number, Value
-                FROM read_csv(
-                    '{inputFile}',
-                    delim = '.',
-                    header = false,
-                    columns = {{
-                        'Number': 'BIGINT',
-                        'Value': 'VARCHAR'
-                    }},
-                    parallel = true
-                )
-            ) TO 'parquets'
-            (FORMAT {format}, OVERWRITE true);
-        ";
-        
-        connection.ExecuteNonQuery(sql);
+        string parquetsPath = Path.Combine(tempDirectory, "parquets");
+        try
+        {
+            string format = GetFormatFor("PARQUET");
+            string sql = @$"
+                COPY (
+                    SELECT Number, Value
+                    FROM read_csv(
+                        '{inputFile}',
+                        delim = '.',
+                        header = false,
+                        columns = {{
+                            'Number': 'BIGINT',
+                            'Value': 'VARCHAR'
+                        }},
+                        parallel = true
+                    )
+                ) TO '{parquetsPath}'
+                (FORMAT {format}, OVERWRITE true);
+            ";
+            
+            connection.ExecuteNonQuery(sql);
 
-        // sort and save
-        sql = @$"
-            COPY (
-                SELECT Number, Value
-                FROM read_parquet('parquets/*.parquet')
-                ORDER BY Value, Number
-            ) TO '{outputFile}'
-            (FORMAT CSV, HEADER false, DELIMITER '.');
-        ";
-        
-        connection.ExecuteNonQuery(sql);
+            // sort and save
+            sql = @$"
+                COPY (
+                    SELECT Number, Value
+                    FROM read_parquet('{parquetsPath}/*.parquet')
+                    ORDER BY Value, Number
+                ) TO '{outputFile}'
+                (FORMAT CSV, HEADER false, DELIMITER '.');
+            ";
+            
+            connection.ExecuteNonQuery(sql);
+
+        }
+        finally
+        {
+            if (Directory.Exists(parquetsPath))
+            {
+                Directory.Delete(parquetsPath, true);
+            }
+        }
     }
 
     private static string GetFormatFor(string name)
@@ -167,7 +179,7 @@ public class LargeFileSortStrategy : ISortStrategy
         {
             return $"{name}, COMPRESSION snappy" +
                 ", ROW_GROUP_SIZE 100000 " +
-                ", ROW_GROUPS_PER_FILE 1" +
+                ", ROW_GROUPS_PER_FILE 5" +
                 ", PER_THREAD_OUTPUT true";
         }
 

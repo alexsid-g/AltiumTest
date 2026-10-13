@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "TestFileGenerator D (with args)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Debug build solution",
+            "program": "${workspaceFolder}/TestFileGenerator/bin/Debug/net8.0/TestFileGenerator.dll",
+            "args": [
+                "-o", "test-5gb.txt",
+                "-s", "5gb",
+                "-d", "5"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SortFile D (with args)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Debug build solution",
+            "program": "${workspaceFolder}/FileSorter/bin/Debug/net8.0/FileSorter.dll",
+            "args": [
+                "-i", "test-10gb.txt",
+                "-o", "sorted-data.txt",
+                "-m", "4GB"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}

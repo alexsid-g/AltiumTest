@@ -1,59 +1,54 @@
-# Altium test task
+# File Generator and Sorter
 
-## Phase 1 — Test File Generator
-As a developer, I want to generate a large text file containing numbered strings and a configurable number of duplicate strings, so that I can test the correctness and performance of the sorting utility.
+## Test File Generator
 
-**Input parameters**
-- `outputFilePath` — path to the generated file.
-- `targetFileSizeBytes` - size of the generated file in bytes. (?)
-- `targetLineCount` - size of the generated file in lines. (?)
-- `duplicateWordsCount` — number of distinct string values that must appear minimum 2 times in the generated file.
+The generator writes newline-delimited records in `<number>. <string>` format. Numbers are random non-negative 64-bit integers, and strings are random slices of its built-in word corpus. Output is buffered and streamed rather than accumulated in memory.
 
-**Output**
-- A text file in which every line follows the format `<number>. <string>`.
-- The generated file is valid input for the sorter.
-- Exactly `duplicateWordsCount` distinct string values occur more than once, subject to the agreed interpretation of this parameter.
+The requested file size is a minimum: generation stops after writing the line that reaches or exceeds that size, so the final file can be slightly larger. Sizes use binary units (`MB` = 1024² bytes, `GB` = 1024³ bytes).
 
---------------
-**Tasks**
-ID	Task	Результат
-G1	Определить формат строки и правила генерации данных	Спецификация формата
-G2	Реализовать генератор уникальных и повторяющихся String-значений	Контролируемые дубликаты
-G3	Реализовать генерацию Number для каждой строки	Числа в допустимом диапазоне
-G4	Организовать потоковую запись в файл	Низкое потребление RAM
-G5	Добавить проверку входных параметров и ошибок файловой системы	Предсказуемое поведение
-G6	Добавить тесты генератора	Проверка формата, размера и количества дубликатов
-G7	Измерить скорость генерации больших файлов	Время генерации и пропускная способность
+```sh
+dotnet run --project TestFileGenerator -- -o test-data.txt -s 10MB
+```
 
-## Phase 2 — File Sorter
-As a developer, I want to sort a large text file containing numbered strings, so that I obtain a correctly ordered output file without requiring the entire input file to fit into memory.
+Options:
 
-**Input parameters**
-- `inputFilePath` — path to the input text file.
-- `memoryLimitBytes` - size of memory to use (all available as default).
-- `tempDirectory` - path to temp directory (system temp as default).
+- `-o` — output file path (required).
+- `-s` — target size, in `MB` or `GB` (required).
+- `-d` — duplicate count option is accepted, but controlled duplicate generation is not implemented and this option currently has no effect.
 
-**Output**
-A sorted text file in which each line preserves its original content.
-Lines are ordered by the String part in ascending order.
+Each generated line has the required format, but the generator does not guarantee unique strings or a specified number of duplicates.
 
-If two String values are equal, their lines are ordered by Number in ascending order.
-Duplicate lines and duplicate String values are preserved.
+Implemented generator tasks:
 
-The sorting process supports files significantly larger than the available RAM, including files of approximately 100 GB.
+| ID | Implemented behavior |
+| --- | --- |
+| G1 | Defines the `<number>. <string>` record format. |
+| G2 | Generates a random non-negative 64-bit number for each record. |
+| G3 | Streams output through a buffered file stream. |
 
------------
-**Tasks**
-ID	Task	Результат
-S1	Реализовать парсер формата <number>. <string>	Корректное разделение Number и String
-S2	Определить и реализовать правила сравнения строк	Детерминированная сортировка
-S3	Реализовать сравнение по Number при равных String	Вторичный ключ сортировки
-S4	Реализовать внешнюю сортировку (external merge sort)	Сортировка файлов больше RAM
-S5	Реализовать создание и слияние промежуточных файлов	Контролируемое использование памяти и диска
+## File Sorter
 
----------
+The sorter reads records as dot-delimited CSV without a header. The first field must be a signed 64-bit integer and the second field is treated as a string. Results are ordered by string ascending, then number ascending; duplicate records are retained. DuckDB reads and writes the data, so output is serialized as CSV using the same delimiter rather than preserving the original line bytes.
 
-S6	Реализовать обработку ошибок ввода-вывода	Корректное завершение при ошибках
-S7	Реализовать запись итогового файла	Полный отсортированный результат
-S8	Добавить unit-тесты и integration-тесты	Проверка корректности сортировки
-S9	Провести performance-тестирование на больших файлах	Время выполнения и использование ресурсов
+```sh
+dotnet run --project FileSorter -- -i test-data.txt -o sorted-data.txt
+```
+
+Options:
+
+- `-i` — input file path (required; must exist).
+- `-o` — output file path (required by the current strategy implementation).
+- `-m` — optional memory limit in `MB` or `GB`. When provided, the sorter selects its simple or disk-backed strategy using an estimate of 1.3 times the input size. The large-file strategy passes the limit to DuckDB.
+- `-d` — optional DuckDB temporary directory for the large-file strategy. It defaults to the current working directory; provide an existing directory.
+
+The large-file path uses DuckDB's disk-backed database and temporary storage. The inactive Parquet split-and-merge path is not part of the current behavior, and no specific maximum supported file size is guaranteed.
+
+Implemented sorter tasks:
+
+| ID | Implemented behavior |
+| --- | --- |
+| S1 | Uses DuckDB CSV parsing to read the number and string fields. |
+| S2 | Orders records by string ascending. |
+| S3 | Uses number ascending as the secondary sort key. |
+| S4 | Uses DuckDB's disk-backed strategy and temporary storage when selected. |
+| S5 | Writes sorted output as dot-delimited CSV without a header. |
